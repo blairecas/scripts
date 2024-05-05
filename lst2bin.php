@@ -13,10 +13,12 @@
     $topram = null;
     if (isset($argv[4])) $topram = octdec($argv[4]);
 
-    if ($mode !== 'bin' && $mode !== 'mac' && $mode !== 'sav' && $mode !== 'bbk' && $mode !== 'bin512') {
+    if ($mode !== 'bin' && $mode !== 'mac' && $mode !== 'sav' && $mode !== 'bbk' && $mode !== 'bin512') 
+    {
         echo "Usage: php.exe -f lst2bin.php in_fname out_fname mode [topram in octal]\n";
         echo "in_fname - .lst filename\n";
-        echo "mode = bin, bin512, bbk, mac, sav (bbk is bin for BK-0010)";
+        echo "mode = bin, bin512, bbk, mac, sav (bbk is bin for BK-0010)\n";
+	echo "if mode = bin - next octal is start addr";
         exit(1);
     }
 
@@ -35,7 +37,7 @@
     ProcessFile();
 
     if ($mode == 'mac') WriteMac(0, $allRAM['high']);
-    if ($mode == 'bin') WriteBin(0, $allRAM['high']);
+    if ($mode == 'bin') WriteBin(octdec($argv[4]), $allRAM['high']);
     if ($mode == 'bin512') WriteBin512(0, $allRAM['high']);
     if ($mode == 'bbk') WriteBinBk();
     if ($mode == 'sav') WriteSav();
@@ -73,7 +75,7 @@ function ProcessFile ()
     {
         $current_line = fgets($fin);
         $b = UseLine($current_line);
-        if (!$b) break;
+	if (!$b) break;
         $lcount++;
     }
     fclose($fin);    
@@ -284,10 +286,12 @@ function WriteBin512 ($start, $end)
 
 function WriteBinBk ()
 {
-    global $allRAM, $output_fname;
+    global $allRAM, $output_fname, $topram;
     $start = 0x200;
+    if ($topram != null) $start = $topram;
     $end = $allRAM['high'];
     $length = $end - $start + 1;
+    echo "BK binary: ".decoct($start)." - ".decoct($start+$length)."\n";
     $g = fopen($output_fname, 'w');
     WriteWord($g, $start);
     WriteWord($g, $length);
