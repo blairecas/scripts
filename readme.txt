@@ -20,5 +20,4 @@ https://github.com/nzeemin/ukncbtl-utils/
 
 bkdecmd.exe
 utility for working with BK-001x disk images by N. Zeemin
-(can't find code on github)
-
+https://github.com/nzeemin/bkdecmd

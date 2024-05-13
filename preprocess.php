@@ -14,11 +14,18 @@
  *     mov #cmd, r5
  *     call ppuexecute
  * ^xAB, ^xCDEF - changed to appropriate octal numbers
+ * @packstart[10] ... .word/.byte ... @packend
+ *     pack bytes with zx0 (10 - will use radix 10, default 8)
 */
 
 
     $prev_empty = true;
     $included_arr = Array();
+
+    $packing_start = false;
+    $packing_data = Array();
+    $packing_rad = 8;
+
     
 function StripComment ($s)
 {
@@ -56,21 +63,21 @@ function IncludeFile ($fn)
     global $included_arr;
     $fn = trim($fn);
     if (!file_exists($fn)) {
-	echo "ERROR: include file $fn does not exists!";
-	exit(1);
+	    echo "ERROR: include file $fn does not exists!";
+	    exit(1);
     }
     if (isset($included_arr[$fn])) {
-	echo "ERROR: can't include file more than once!";
-	exit(1);
+	    echo "ERROR: can't include file more than once!";
+	    exit(1);
     }
     $included_arr[$fn] = 1;
     echo "including $fn\n";
     $f = fopen($fn, "r");
     while (!feof($f))
     {
-	$s = fgets($f);
-	$s = ProcessLine($s);
-	OutputLine($s);
+	    $s = fgets($f);
+	    $s = ProcessLine($s);
+	    OutputLine($s);
     }
     fclose($f);
 }
@@ -79,31 +86,33 @@ function IncludeFileBin ($fn)
 {
     $fn = trim($fn);
     if (!file_exists($fn)) {
-	echo "ERROR: include file $fn does not exists!";
-	exit(1);
+	    echo "ERROR: include file $fn does not exists!";
+	    exit(1);
     }
-    echo "including binary $fn\n";
     $filesize = filesize($fn);
     $f = fopen($fn, 'rb');
     $binary = fread($f, $filesize);
     fclose($f);
+    $sout = "";
     $s = "";
     $k = 0;
     for ($i=0; $i<$filesize; $i++)
     {
-	if ($k==0) $s = $s . "\t.byte\t";
-	$bb = ord($binary[$i]);
+	    if ($k==0) $s = $s . "\t.byte\t";
+	    $bb = ord($binary[$i]);
         $s = $s . decoct($bb);
-	if ($k<16 && ($i<($filesize-1))) { 
-	    $s = $s . ", "; 
-	    $k++; 
-	} else {
-            OutputLine($s);
-	    $s = ""; $k=0; 
-	}
+	    if ($k<16 && ($i<($filesize-1))) { 
+	        $s = $s . ", "; 
+	        $k++; 
+	    } else {
+            $sout = $sout . $s . "\n";
+	        $s = ""; $k=0;
+	    }
     }
-    if (strlen($s) > 0) OutputLine($s);
+    if (strlen($s) > 0) $sout = $sout . $s . "\n";
+    return $sout;
 }
+
 
 function ReplaceHexToOctal ($arr)
 {
@@ -111,63 +120,125 @@ function ReplaceHexToOctal ($arr)
     return decoct($d);
 }
 
+
+function AddDataToPacking ($s)
+{
+    global $packing_data, $packing_rad;
+    preg_match_all('/(\d+)[,]?\s*/i', $s, $arr);
+    if (count($arr) != 2) return;
+    $is_byte = true; if (stripos($s, ".word") !== false) $is_byte = false;
+    foreach ($arr[1] as $k => $v) {
+        $b = $packing_rad==8 ? octdec($v) : (int)$v;
+        if ($is_byte) {
+            array_push($packing_data, $b);
+        } else {
+            array_push($packing_data, $b&0xFF, ($b>>8)&0xFF);
+        }
+    }
+}
+
+
+function GetPacked ()
+{
+    global $fname, $packing_data;
+    // write to temp file
+    $_fname = "_" . $fname . ".pak";
+    $_fname_zx0 = "_" . $fname . ".zx0";
+    if (file_exists(($_fname))) { echo "ERROR: file exists $_fname"; exit(1); }
+    if (file_exists(($_fname_zx0))) { echo "ERROR: file exists $_fname_zx0"; exit(1); }
+    if (count($packing_data) == 0) { echo "ERROR: packing_data size == 0"; exit(1); }
+    $f = fopen($_fname, "wb");
+    foreach ($packing_data as $k => $v) fwrite($f, chr($v), 1);
+    fclose($f);
+    // pack it
+    exec(dirname(__FILE__)."/zx0 -f -q ".$_fname." ".$_fname_zx0);
+    unlink($_fname);
+    // get as .mac code
+    $s = IncludeFileBin($_fname_zx0);
+    unlink($_fname_zx0);
+    return $s;
+}
+
+
 function ProcessLine ($s)
 {
+    global $packing_start, $packing_data, $packing_rad;
+
     // remove comment
     $s = StripComment($s);
     if ($s === false) return false;
     $s2 = ltrim($s);
+    // process @packend
+    if (strtolower(substr($s2, 0, 8)) === '@packend') 
+    {
+        $packing_start = false;
+        return GetPacked();
+    }
+    // process @packstart
+    if (strtolower(substr($s2, 0, 10)) === '@packstart')
+    {
+        $packing_start = true;
+        $packing_data = Array();
+        $packing_rad = 8;
+        return false;
+    }
     // process @includebin
     if (strlen($s2) > 13 && (strtolower(substr($s2, 0, 11)) === '@includebin'))
     {
-	$s2 = substr($s2, 12);
-	IncludeFileBin($s2);
-	return false;
+        $s2 = substr($s2, 12);
+        echo "including binary $s2\n";
+	    return IncludeFileBin($s2);
     }    
     // process @include
     if (strlen($s2) > 9 && (strtolower(substr($s2, 0, 8)) === '@include'))
     {
-	$s2 = substr($s2, 9);
-	IncludeFile($s2);
-	return false;
+    	$s2 = substr($s2, 9);
+    	IncludeFile($s2);
+    	return false;
     }
     // process .ppexec
     $s = preg_replace("/(\.ppexe)(\s+)(\S+)/i", "mov$2$3, R5\r\n\tcall\tPPUExecute", $s);
     // change hex ^xABCD to octal
     $s = preg_replace_callback('/\\^x([a-f0-9]+)/i', 'ReplaceHexToOctal', $s);
-    //
+    // if we are packing
+    if ($packing_start)
+    {
+        AddDataToPacking($s);
+        return false;
+    }
     return $s;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-    $fname = $argv[1];
+    $fname = false;
+    if (isset($argv[1])) $fname = $argv[1];
     if (!$fname) {
-	echo "Usage: php.exe -f preprocess.php filename.mac\n";
-	exit(0);
+	    echo "Usage: php.exe -f preprocess.php filename.mac\n";
+	    exit(0);
     }
     
     $fin = fopen($fname, "r");
     if (!$fin) {
-	echo "Can't open file $fname\n";
-	exit(1);
+	    echo "Can't open file $fname\n";
+	    exit(1);
     }
     
     $ofname = "_".$fname;
     $fout = fopen($ofname, "w");
     if (!$fout) {
-	echo "Can't open file $ofname\n";
-	fclose($fin);
-	exit(1);
+    	echo "Can't open file $ofname\n";
+    	fclose($fin);
+    	exit(1);
     }
     
     $linenum = 1;
     while (!feof($fin))
     {
-	$sin = fgets($fin);
-	$sout = ProcessLine($sin, $linenum);
-	OutputLine($sout);
-	$linenum++;
+    	$sin = fgets($fin);
+    	$sout = ProcessLine($sin, $linenum);
+    	OutputLine($sout);
+    	$linenum++;
     }
     
     fclose($fin);

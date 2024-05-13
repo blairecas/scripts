@@ -1,0 +1,10 @@
+	.title	Test2
+	
+Start:
+@packstart
+	.byte	10, 7, 6, 5, 4, 3, 2, 1
+	.byte	10, 7, 6, 5, 4, 3, 2, 1	
+	.byte	10, 7, 6, 5, 4, 3, 2, 1
+@packend
+
+	.end	Start
