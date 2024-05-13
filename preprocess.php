@@ -63,32 +63,33 @@ function IncludeFile ($fn)
     global $included_arr;
     $fn = trim($fn);
     if (!file_exists($fn)) {
-	    echo "ERROR: include file $fn does not exists!";
-	    exit(1);
+        echo "ERROR: include file $fn does not exists!";
+        exit(1);
     }
     if (isset($included_arr[$fn])) {
-	    echo "ERROR: can't include file more than once!";
-	    exit(1);
+        echo "ERROR: can't include file more than once!";
+        exit(1);
     }
     $included_arr[$fn] = 1;
     echo "including $fn\n";
     $f = fopen($fn, "r");
     while (!feof($f))
     {
-	    $s = fgets($f);
-	    $s = ProcessLine($s);
-	    OutputLine($s);
+        $s = fgets($f);
+        $s = ProcessLine($s);
+        OutputLine($s);
     }
     fclose($f);
 }
 
-function IncludeFileBin ($fn)
+function IncludeFileBin ($fn, $rad)
 {
     $fn = trim($fn);
     if (!file_exists($fn)) {
-	    echo "ERROR: include file $fn does not exists!";
-	    exit(1);
+        echo "ERROR: include file $fn does not exists!";
+        exit(1);
     }
+    if (!isset($rad)) $rad = 8;
     $filesize = filesize($fn);
     $f = fopen($fn, 'rb');
     $binary = fread($f, $filesize);
@@ -98,16 +99,16 @@ function IncludeFileBin ($fn)
     $k = 0;
     for ($i=0; $i<$filesize; $i++)
     {
-	    if ($k==0) $s = $s . "\t.byte\t";
-	    $bb = ord($binary[$i]);
-        $s = $s . decoct($bb);
-	    if ($k<16 && ($i<($filesize-1))) { 
-	        $s = $s . ", "; 
-	        $k++; 
-	    } else {
+        if ($k==0) $s = $s . "\t.byte\t";
+        $bb = ord($binary[$i]);
+        if ($rad == 8) $s = $s . decoct($bb); else $s = $s . $bb;
+        if ($k<16 && ($i<($filesize-1))) { 
+            $s = $s . ", "; 
+            $k++; 
+        } else {
             $sout = $sout . $s . "\n";
-	        $s = ""; $k=0;
-	    }
+            $s = ""; $k=0;
+        }
     }
     if (strlen($s) > 0) $sout = $sout . $s . "\n";
     return $sout;
@@ -128,7 +129,7 @@ function AddDataToPacking ($s)
     if (count($arr) != 2) return;
     $is_byte = true; if (stripos($s, ".word") !== false) $is_byte = false;
     foreach ($arr[1] as $k => $v) {
-        $b = $packing_rad==8 ? octdec($v) : (int)$v;
+        $b = ($packing_rad==8 ? octdec($v) : intval($v, 10));
         if ($is_byte) {
             array_push($packing_data, $b);
         } else {
@@ -140,7 +141,7 @@ function AddDataToPacking ($s)
 
 function GetPacked ()
 {
-    global $fname, $packing_data;
+    global $fname, $packing_data, $packing_rad;
     // write to temp file
     $_fname = "_" . $fname . ".pak";
     $_fname_zx0 = "_" . $fname . ".zx0";
@@ -154,7 +155,7 @@ function GetPacked ()
     exec(dirname(__FILE__)."/zx0 -f -q ".$_fname." ".$_fname_zx0);
     unlink($_fname);
     // get as .mac code
-    $s = IncludeFileBin($_fname_zx0);
+    $s = IncludeFileBin($_fname_zx0, $packing_rad);
     unlink($_fname_zx0);
     return $s;
 }
@@ -174,6 +175,14 @@ function ProcessLine ($s)
         $packing_start = false;
         return GetPacked();
     }
+    // process @packstart10
+    if (strtolower(substr($s2, 0, 12)) === '@packstart10')
+    {
+        $packing_start = true;
+        $packing_data = Array();
+        $packing_rad = 10;
+        return false;
+    }
     // process @packstart
     if (strtolower(substr($s2, 0, 10)) === '@packstart')
     {
@@ -187,7 +196,7 @@ function ProcessLine ($s)
     {
         $s2 = substr($s2, 12);
         echo "including binary $s2\n";
-	    return IncludeFileBin($s2);
+        return IncludeFileBin($s2, 8);
     }    
     // process @include
     if (strlen($s2) > 9 && (strtolower(substr($s2, 0, 8)) === '@include'))
@@ -214,14 +223,14 @@ function ProcessLine ($s)
     $fname = false;
     if (isset($argv[1])) $fname = $argv[1];
     if (!$fname) {
-	    echo "Usage: php.exe -f preprocess.php filename.mac\n";
-	    exit(0);
+        echo "Usage: php.exe -f preprocess.php filename.mac\n";
+        exit(0);
     }
     
     $fin = fopen($fname, "r");
     if (!$fin) {
-	    echo "Can't open file $fname\n";
-	    exit(1);
+        echo "Can't open file $fname\n";
+        exit(1);
     }
     
     $ofname = "_".$fname;
