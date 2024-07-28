@@ -126,19 +126,19 @@ function UseLine ( $sline )
     if ($type2==1) $next_addr++;
     if ($type2==2 || $type2==3) $next_addr += 2;
     if ($type2==3) {
-	echo "REL2: ".decoct($oct2)." - ".decoct($next_addr);
+	// echo "REL2: ".decoct($oct2)." - ".decoct($next_addr);
 	$oct2 = $oct2 - $next_addr;
 	if ($oct2<0) $oct2 = (0x10000 + $oct2) & 0xFFFF;
-	echo " = ".decoct($oct2)." on $lnum\n";
+	// echo " = ".decoct($oct2)." on $lnum\n";
     }
     // .. for 3rd octal
     if ($type3==1) $next_addr++;
     if ($type3==2 || $type3==3) $next_addr += 2;
     if ($type3==3) {
-	echo "REL3: ".decoct($oct3)." ".decoct($next_addr);
+	// echo "REL3: ".decoct($oct3)." ".decoct($next_addr);
 	$oct3 = $oct3 - $next_addr;
 	if ($oct3<0) $oct3 = (0x10000 + $oct3) & 0xFFFF;
-	echo " = ".decoct($oct3)." on $lnum\n";
+	// echo " = ".decoct($oct3)." on $lnum\n";
     }
     
     // DEBUG: echo decoct($gAddr)."-".$type0."\t\t".decoct($oct1)."-".$type1."\t\t".decoct($oct2)."-".$type2."\t\t".decoct($oct3)."-".$type3."\n";
