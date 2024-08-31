@@ -209,14 +209,15 @@ function PutBytes ($adr, $w, $type)
 {
     global $allRAM, $lnum;
     global $current_line;
+    // type == 0 - don't use this
+    if ($type == 0) return $adr;
+    // check for overflow
     if ($adr > $allRAM['max'] || $adr < $allRAM['min'])
     {
-        echo "ERROR: address $adr is out of range on line $lnum\n";
+        echo "ERROR: address ".decoct($adr)." is out of range (".decoct($allRAM['min'])."-".decoct($allRAM['max']).") on line $lnum\n";
 	    echo "$current_line\n";
         exit(1);
     }
-    // type == 0 - don't use this
-    if ($type == 0) return $adr;
     // type == 1 - its a byte
     if ($type == 1) { 
         $allRAM['ram'][$adr] = $w & 0xFF;
