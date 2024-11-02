@@ -120,6 +120,7 @@ function toWavFile ($bin, $sampleRate)
         echo "ERROR: File $input_file is not exist\n";
         exit(1);
     }
+    $binsize = filesize($input_fname);
     $input_filename = pathinfo($input_fname, PATHINFO_FILENAME);
     $output_wavname = pathinfo($input_fname, PATHINFO_DIRNAME) . '/' . $input_filename . '.wav';
 
@@ -137,7 +138,7 @@ function toWavFile ($bin, $sampleRate)
     }    
 
     // convert to wav bytes
-    echo "making $input_filename.wav ... ";
+    echo "making $input_filename.wav ... $binsize -> ";
     $bin = insertFileNameAndCheckSum($bin, $input_filename);
     $bin = binaryToSoundBytes($bin);
     $bin = toWavFile($bin, SAMPLE_RATE_10);

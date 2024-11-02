@@ -9,6 +9,7 @@ make binaries (.sav or .bin) from macro-11 .lst files
 macro11.exe, sysmac.sml
 version of macro-11 compiler for PDP-11
 https://github.com/j-hoppe/MACRO11
+(changed a bit by me, added abort by undefined symbol on 2nd pass)
 
 zx0.exe
 ZX0 compression utility

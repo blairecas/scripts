@@ -68,12 +68,15 @@ function ProcessFile ()
     $lcount = 0;
     $fin = fopen($input_fname, "r");
     if ($fin === false) {
-        echo "ERROR: file $input_fname not found\n";
+        echo "ERROR: unable to open $input_fname\n";
         exit(1);
     }    
     while (!feof($fin))
     {
         $current_line = fgets($fin);
+        // don't use first line if it contains word 'macro11'
+	if (($lcount==0) && (strpos($current_line, "macro11") !== false)) continue;
+	//
         $b = UseLine($current_line);
 	if (!$b) break;
         $lcount++;
