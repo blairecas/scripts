@@ -18,7 +18,7 @@
         echo "Usage: php.exe -f lst2bin.php in_fname out_fname mode [topram in octal]\n";
         echo "in_fname - .lst filename\n";
         echo "mode = bin, bin512, bbk, mac, sav (bbk is bin for BK-0010)\n";
-	echo "if mode = bin - next octal is start addr";
+	    echo "if mode = bin - next octal is start addr";
         exit(1);
     }
 
