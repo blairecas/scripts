@@ -10,15 +10,17 @@
     $input_fname = $argv[1];
     $output_fname = $argv[2];
     $mode = $argv[3];
-    $topram = null;
-    if (isset($argv[4])) $topram = octdec($argv[4]);
+    $arg4 = -1; if (isset($argv[4])) $arg4 = octdec($argv[4]);
+    $arg5 = -1; if (isset($argv[5])) $arg5 = octdec($argv[5]);
 
     if ($mode !== 'bin' && $mode !== 'mac' && $mode !== 'sav' && $mode !== 'bbk' && $mode !== 'bin512') 
     {
-        echo "Usage: php.exe -f lst2bin.php in_fname out_fname mode [topram in octal]\n";
+        echo "Usage: php.exe -f lst2bin.php in_fname out_fname mode [start addr octal] [align to octal]\n";
         echo "in_fname - .lst filename\n";
         echo "mode = bin, bin512, bbk, mac, sav (bbk is bin for BK-0010)\n";
-	    echo "if mode = bin - next octal is start addr";
+        echo "if mode = bin/bin512/bbk - next octal is start addr (default 1000)\n";
+        echo "if mode = sav - next octal is top ram addr\n";
+        echo "align to size works in bin mode";
         exit(1);
     }
 
@@ -36,11 +38,11 @@
 
     ProcessFile();
 
-    if ($mode == 'mac') WriteMac(0, $allRAM['high']);
-    if ($mode == 'bin') WriteBin(octdec($argv[4]), $allRAM['high']);
-    if ($mode == 'bin512') WriteBin512(0, $allRAM['high']);
-    if ($mode == 'bbk') WriteBinBk();
-    if ($mode == 'sav') WriteSav();
+    if ($mode == 'mac')    WriteMac(0, $allRAM['high']);
+    if ($mode == 'bin')    WriteBin($arg4, $allRAM['high'], $arg5);
+    if ($mode == 'bin512') WriteBin512($arg4, $allRAM['high']);
+    if ($mode == 'bbk')    WriteBinBk($arg4);
+    if ($mode == 'sav')    WriteSav();
 
     exit(0);
 
@@ -64,21 +66,21 @@ function exit_with_error ($s)
 function ProcessFile ()
 {
     global $input_fname, $current_line;
-    echo "processing $input_fname\n";
+    echo "processing $input_fname ... ";
     $lcount = 0;
     $fin = fopen($input_fname, "r");
     if ($fin === false) {
-        echo "ERROR: unable to open $input_fname\n";
+        echo "ERROR: unable to open input file\n";
         exit(1);
     }    
     while (!feof($fin))
     {
         $current_line = fgets($fin);
         // don't use first line if it contains word 'macro11'
-	if (($lcount==0) && (strpos($current_line, "macro11") !== false)) continue;
-	//
+        if (($lcount==0) && (strpos($current_line, "macro11") !== false)) continue;
+        //
         $b = UseLine($current_line);
-	if (!$b) break;
+        if (!$b) break;
         $lcount++;
     }
     fclose($fin);    
@@ -255,20 +257,25 @@ function WriteWord ($g, $w)
 function WriteBinaryToFile($g, $start, $end)
 {
     global $allRAM;
-	for ($i=$start; $i<=$end; $i++)
-	{
-	    $byte = 0x00;
-	    if (isset($allRAM['ram'][$i])) $byte = $allRAM['ram'][$i];
-	    $s = chr($byte); fwrite($g, $s, 1);
-	}    
+    for ($i=$start; $i<=$end; $i++)
+    {
+        $byte = 0x00;
+        if (isset($allRAM['ram'][$i])) $byte = $allRAM['ram'][$i];
+        fwrite($g, chr($byte), 1);
+    }
 }
 
 
-function WriteBin ($start, $end)
+function WriteBin ($start, $end, $align)
 {
     global $output_fname;
+    if ($start < 0) $start = 0x200;
     $g = fopen($output_fname, 'w');
     WriteBinaryToFile($g, $start, $end);
+    $size = $end-$start+1;
+    if (($align > 0)) {
+        if ($size % $align != 0) for ($i=0; $i<($align-($size%$align)); $i++) fwrite($g, chr(0x00));
+    }
     fclose($g);
 }
 
@@ -276,23 +283,23 @@ function WriteBin ($start, $end)
 function WriteBin512 ($start, $end)
 {
     global $output_fname;
+    if ($start < 0) $start = 0x200;
     $g = fopen($output_fname, 'w');
     $l = $end - $start + 1;
     if (($l % 512) != 0) {
-	echo "correcting file size to 512 bytes alignment\n";
 	$l = ($l + 512) & 0xFE00;
 	$end = $start + $l - 1;
     }
+    echo "Binary 512: ".decoct($start)." - ".decoct($end)."\n";
     WriteBinaryToFile($g, $start, $end);
     fclose($g);
 }
 
 
-function WriteBinBk ()
+function WriteBinBk ($start)
 {
-    global $allRAM, $output_fname, $topram;
-    $start = 0x200;
-    if ($topram != null) $start = $topram;
+    global $allRAM, $output_fname;
+    if ($start < 0) $start = 0x200;
     $end = $allRAM['high'];
     $length = $end - $start + 1;
     echo "BK binary: ".decoct($start)." - ".decoct($start+$length)."\n";
@@ -323,15 +330,14 @@ function WriteMac ($start, $end)
 
 function WriteSav ()
 {
-    global $allRAM;
-    global $topram;
+    global $allRAM, $arg4;    
     // clear first block
     for ($i=0; $i<0x200; $i++) $allRAM['ram'][$i] = 0;
     $allRAM['ram'][0x21] = 0x02;    // 0x20-0x21 - relative start addr (0x0200)
     $allRAM['ram'][0x23] = 0x02;    // 0x22-0x23 - initial location of stack pointer (0x0200)
     // 0x28-0x29 - program's high limit - word aligned?
     $high = ($allRAM['high']+2) & 0xFFFE;
-    if ($topram != null) $high = $topram;
+    if ($arg4 >= 0) $high = $arg4;
     $allRAM['ram'][0x28] = ($high & 0xFF);
     $allRAM['ram'][0x29] = (($high & 0xFF00) >> 8);
     // 0xF0-0xFF - bitmask area - to load blocks from file [11111000][...] bytes, bits are readed from high to low
@@ -358,5 +364,5 @@ function WriteSav ()
     // align high to 512-bytes
     $allRAM['high'] = (($allRAM['high']+512) & 0xFE00) - 1;
     // save 
-    WriteBin(0, $allRAM['high']);
+    WriteBin(0, $allRAM['high'], -1);
 }

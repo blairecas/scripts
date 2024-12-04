@@ -6,6 +6,15 @@ preprocess .mac files, include binaries, convert hex to octals, etc.
 lst2bin.php
 make binaries (.sav or .bin) from macro-11 .lst files 
 
+aout2bin.php
+make BK0010 binaries from a.out PDP-11 files
+
+bin2wav.php
+make .wav files for BK0010 (to use tape loader)
+
+invert.php
+invert bytes in file (byte^0xFF, used with MS0511 HDD images)
+
 macro11.exe, sysmac.sml
 version of macro-11 compiler for PDP-11
 https://github.com/j-hoppe/MACRO11
@@ -31,3 +40,4 @@ rt11.exe, system.dsk
 PDP-11 emulator for windows console to compile macro-11 file more native way like:
 rt11.exe macro hello
 rt11.exe link hello
+(also can run console app with rt11.exe run hd1:hello)

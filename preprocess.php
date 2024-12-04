@@ -9,10 +9,6 @@
  *     will add file.ext lines to output file
  * @includebin file.ext
  *     will add file.ext as .byte ** ** **
- * .ppexe #cmd
- *     as macro command 
- *     mov #cmd, r5
- *     call ppuexecute
  * ^xAB, ^xCDEF - changed to appropriate octal numbers
  * @packstart[10] ... .word/.byte ... @packend
  *     pack bytes with zx0 (10 - will use radix 10, default 8)
@@ -205,8 +201,6 @@ function ProcessLine ($s)
     	IncludeFile($s2);
     	return false;
     }
-    // process .ppexec
-    $s = preg_replace("/(\.ppexe)(\s+)(\S+)/i", "mov$2$3, R5\r\n\tcall\tPPUExecute", $s);
     // change hex ^xABCD to octal
     $s = preg_replace_callback('/\\^x([a-f0-9]+)/i', 'ReplaceHexToOctal', $s);
     // if we are packing
