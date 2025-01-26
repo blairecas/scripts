@@ -13,11 +13,11 @@
     $arg4 = -1; if (isset($argv[4])) $arg4 = octdec($argv[4]);
     $arg5 = -1; if (isset($argv[5])) $arg5 = octdec($argv[5]);
 
-    if ($mode !== 'bin' && $mode !== 'mac' && $mode !== 'sav' && $mode !== 'bbk' && $mode !== 'bin512') 
+    if ($mode !== 'bin' && $mode !== 'mac' && $mode !== 'sav' && $mode !== 'bbk' && $mode !== 'bin512' && $mode !== 'bkpack') 
     {
         echo "Usage: php.exe -f lst2bin.php in_fname out_fname mode [start addr octal] [align to octal]\n";
         echo "in_fname - .lst filename\n";
-        echo "mode = bin, bin512, bbk, mac, sav (bbk is bin for BK-0010)\n";
+        echo "mode = bin, bin512, bbk, bkpack, mac, sav\n";
         echo "if mode = bin/bin512/bbk - next octal is start addr (default 1000)\n";
         echo "if mode = sav - next octal is top ram addr\n";
         echo "align to size works in bin mode";
@@ -42,6 +42,7 @@
     if ($mode == 'bin')    WriteBin($arg4, $allRAM['high'], $arg5);
     if ($mode == 'bin512') WriteBin512($arg4, $allRAM['high']);
     if ($mode == 'bbk')    WriteBinBk($arg4);
+    if ($mode == 'bkpack') WriteBkpack();
     if ($mode == 'sav')    WriteSav();
 
     exit(0);
@@ -328,6 +329,56 @@ function WriteMac ($start, $end)
 }
 
 
+// bk binary with packed data from addr 2000(8)
+// 1000-2000 loader
+// 2000      packed size in bytes
+// 2002-.... packed data
+//
+function WriteBkpack ()
+{
+    global $allRAM, $output_fname;
+    // check size
+    $end = $allRAM['high'];
+    if ($end <= 01777) { echo "ERROR: data end addr must be greater than 1777(8)"; exit(1); }
+    // compress data from 2000(8)..
+    $zx0_fname_src = $output_fname . ".zxs";
+    if (file_exists(($zx0_fname_src))) { echo "ERROR: file exists $zx0_fname_src"; exit(1); }
+    $zx0_fname_dst = $zx0_fname_src . ".zx0";
+    if (file_exists(($zx0_fname_dst))) { echo "ERROR: file exists $zx0_fname_dst"; exit(1); }
+    $f = fopen($zx0_fname_src, "wb");
+    $size = 0;
+    for ($i=02000; $i<=$end; $i++) { 
+        $byte = 0x00; if (isset($allRAM['ram'][$i])) $byte = $allRAM['ram'][$i];
+        fwrite($f, chr($byte), 1); 
+        $size++; 
+    }
+    fclose($f); 
+    echo "packing 02000..0".decoct($end).", size $size -> ";
+    exec(dirname(__FILE__)."/zx0 -f -q ".$zx0_fname_src." ".$zx0_fname_dst);
+    unlink($zx0_fname_src);
+    // read compressed and put to RAM
+    $size_zx0 = filesize($zx0_fname_dst);
+    echo "$size_zx0 bytes\n";
+    if ($size_zx0 == 0) { echo "ERROR: filesize=0 of file $zx0_fname_dst"; exit(1); }    
+    $f = fopen($zx0_fname_dst, "rb");
+    $data = fread($f, $size_zx0);
+    fclose($f);
+    for ($i=0; $i<$size_zx0; $i++) $allRAM['ram'][02002+$i] = ord($data[$i]);
+    unlink($zx0_fname_dst);
+    // put compressed size
+    $allRAM['ram'][02000] = $size_zx0 & 0xFF;
+    $allRAM['ram'][02001] = ($size_zx0 >> 8) & 0xFF;
+    // write resulting binary
+    $g = fopen($output_fname, 'w');
+    WriteWord($g, 01000);
+    WriteWord($g, 01000+2+$size_zx0);
+    WriteBinaryToFile($g, 01000, 02002+$size_zx0-1);
+    fclose($g);
+}
+
+
+// .sav format for RT-11 
+//
 function WriteSav ()
 {
     global $allRAM, $arg4;    
@@ -343,7 +394,7 @@ function WriteSav ()
     // 0xF0-0xFF - bitmask area - to load blocks from file [11111000][...] bytes, bits are readed from high to low
     $adr = $high - 1;
     if ($adr < 0x200) {
-        echo "ERROR: sav mode must be with at least 2 blocks!";
+        echo "ERROR: sav mode data must be at least 2 blocks in size!";
         exit(1);
     }
     $block0adr = 0xF0;

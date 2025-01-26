@@ -7,7 +7,7 @@
     {
         echo "Utility to increase file size to be aligned with some value\n";
         echo "php -f app_file.php file.ext align\n";
-	echo "align - number in octal\n";
+        echo "align - number in octal\n";
         exit(1);
     }
 
