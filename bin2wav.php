@@ -23,6 +23,11 @@ define('AFTER_TUNE', chr(LEVEL_1_TUNE).chr(LEVEL_1_TUNE).chr(LEVEL_1_TUNE).chr(L
 define('SYNCHRO_LONG', chr(LEVEL_1_TUNE).chr(LEVEL_1_TUNE).chr(LEVEL_0).chr(LEVEL_0));
 
 
+    // filename padding char in header
+    // space for monitor, zero for basic
+    $pad_char = ' ';
+    
+
 function toStrWord ( $w )
 {
     return chr($w&0xff) . chr(($w>>8)&0xff);
@@ -38,8 +43,9 @@ function toStrDword ( $dw )
 // Внедрение имени файла и контрольной суммы в бинарные данные
 function insertFileNameAndCheckSum ($binary, $fileName) 
 {
+    global $pad_char;
     $hdr = substr($binary, 0, 4);
-    $fnm = str_pad(substr($fileName, 0, 16), 16, " ", STR_PAD_RIGHT);
+    $fnm = str_pad(substr($fileName, 0, 16), 16, $pad_char, STR_PAD_RIGHT);
     $dat = substr($binary, 4);
     $c = 0;
     for ($i=0; $i<strlen($dat); $i++)
@@ -110,7 +116,8 @@ function toWavFile ($bin, $sampleRate)
     // usage
     if (!isset($argv[1])) {
         echo "BK 0010/0011 binary to .wav file converter\n";
-        echo "Usage: php -f bin2wav.php filename.bin\n";
+        echo "Usage: php -f bin2wav.php filename.bin [bas]\n";
+        echo "       optional bas parameter - convert for basic CLOAD\n";
         exit(1);
     }
 
@@ -123,6 +130,9 @@ function toWavFile ($bin, $sampleRate)
     $binsize = filesize($input_fname);
     $input_filename = pathinfo($input_fname, PATHINFO_FILENAME);
     $output_wavname = pathinfo($input_fname, PATHINFO_DIRNAME) . '/' . $input_filename . '.wav';
+
+    // maybe for basic
+    if (isset($argv[2]) && ($argv[2]=='bas')) $pad_char=chr(0);
 
     // get binary and check basic validity
     $bin = file_get_contents($input_fname);
