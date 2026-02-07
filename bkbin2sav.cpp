@@ -76,11 +76,11 @@ int main ( int argc, char* argv[])
     fseek(fin, 0L, SEEK_END);
     input_size = ftell(fin);
     if (input_size <= 0x004) exit_with_msg("(!) input file too small (less than 5 bytes)\n");
-    if (input_size > 0xFE00) exit_with_msg("(!) input file too big (^_^ it can't be BK binary)\n");
+    if (input_size > 0xF000) exit_with_msg("(!) input file too big (^_^ it can't be BK binary)\n");
     fseek(fin, 0L, SEEK_SET);
     fread(&bin_start, 2, 1, fin);
     fread(&bin_length, 2, 1, fin);
-    printf("BK binary header - start 0%o (0x%X), length %o (0x%X)\n", bin_start, bin_start, bin_length, bin_length);
+    printf("BK binary header - start 0%o (0x%X), length 0%o (0x%X)\n", bin_start, bin_start, bin_length, bin_length);
     if (bin_start != 0x200) exit_with_msg("(!) use 01000 (0x200) as a starting addr in BK binary\n");
     if (bin_length != (input_size-4)) exit_with_msg("(!) binary header size is incorrect\n");
 
