@@ -116,8 +116,9 @@ function toWavFile ($bin, $sampleRate)
     // usage
     if (!isset($argv[1])) {
         echo "BK 0010/0011 binary to .wav file converter\n";
-        echo "Usage: php -f bin2wav.php filename.bin [bas]\n";
+        echo "Usage: php -f bin2wav.php filename.bin [bas] [start in octal]\n";
         echo "       optional bas parameter - convert for basic CLOAD\n";
+	echo "       optional start parameter - for not .bin files (raw data)\n";
         exit(1);
     }
 
@@ -132,20 +133,41 @@ function toWavFile ($bin, $sampleRate)
     $output_wavname = pathinfo($input_fname, PATHINFO_DIRNAME) . '/' . $input_filename . '.wav';
 
     // maybe for basic
-    if (isset($argv[2]) && ($argv[2]=='bas')) $pad_char=chr(0);
-
-    // get binary and check basic validity
-    $bin = file_get_contents($input_fname);
-    $length4 = strlen($bin) - 4;
-    if ($length4 < 1) {
-        echo "ERROR: File is too small (less than 5 bytes)\n";
-        exit(1);
+    $idx_start = 2;
+    if (isset($argv[2]) && ($argv[2]=='bas')) {
+        $pad_char = chr(0);
+        $idx_start = 3;
     }
-    $bin_length = ord($bin[2]) + (ord($bin[3]) << 8);
-    if ($bin_length != $length4) {
-        echo "ERROR: Binary file is bad, lengths are wrong (bin:$bin_length, file-4:$length4)\n";
-        exit(1);
-    }    
+    
+    // maybe use custom start and length
+    $custom_start = -1;
+    if (isset($argv[$idx_start])) {
+        $custom_start = intval($argv[$idx_start], 8);
+        $input_filename = $input_filename . '.' . pathinfo($input_fname, PATHINFO_EXTENSION);
+        $output_wavname = pathinfo($input_fname, PATHINFO_DIRNAME) . '/' . $input_filename . '.wav';
+    }
+
+    // binary
+    $bin = file_get_contents($input_fname);
+    if ($custom_start >= 0) {
+        $hdr = chr($custom_start & 0xFF) .
+               chr(($custom_start>>8) & 0xFF) .
+	       chr($binsize & 0xFF) .
+	       chr(($binsize>>8) & 0xFF);
+	$bin = $hdr . $bin;
+    } else {    
+        // basic validity
+        $length4 = strlen($bin) - 4;
+        if ($length4 < 1) {
+            echo "ERROR: File is too small (less than 5 bytes)\n";
+            exit(1);
+        }
+        $bin_length = ord($bin[2]) + (ord($bin[3]) << 8);
+        if ($bin_length != $length4) {
+            echo "ERROR: Binary file is bad, lengths are wrong (bin:$bin_length, file-4:$length4)\n";
+            exit(1);
+        }
+    }
 
     // convert to wav bytes
     echo "making $input_filename.wav ... $binsize -> ";
